@@ -50,7 +50,7 @@ module.exports = {
     spawn: function() {
         var workers = _.filter(Game.creeps, (creep) => creep.memory.role == 'worker');
 
-        if (!workers || workers.length < 2) {
+        if (!workers || workers.length < 4) {
             var newName = 'Worker' + Game.time;
 
             for (var spawnName in Game.spawns) {
