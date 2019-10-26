@@ -1,4 +1,4 @@
-var roleWorker = require('role.worker');
+var workerManager = require('worker-manager');
 
 module.exports.loop = function () {
     cleanMemory();
@@ -15,7 +15,7 @@ function cleanMemory() {
 }
 
 function manageCreeps() {
-    roleWorker.spawn();
+    workerManager.spawn();
 
     for(var name in Game.creeps) {
         var creep = Game.creeps[name];
@@ -23,11 +23,11 @@ function manageCreeps() {
         switch (creep.memory.role) {
             case 'worker':
                 if (!creep.memory.action) {
-                    roleWorker.findWork(creep);
+                    workerManager.findWork(creep);
                 }
 
                 if (creep.memory.action) {
-                    roleWorker.doWork(creep);
+                    workerManager.doWork(creep);
                 }
                 break;
         }

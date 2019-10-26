@@ -1,4 +1,4 @@
-var roleWorker = {
+module.exports = {
     doWork: function(creep) {
         switch(creep.memory.action) {
             case 'harvest':
@@ -154,5 +154,3 @@ var roleWorker = {
         return [WORK, CARRY, CARRY, MOVE, MOVE];
     }
 };
-
-module.exports = roleWorker;
