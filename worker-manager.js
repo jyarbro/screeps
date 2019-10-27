@@ -174,7 +174,7 @@ function build(creep) {
 
     var target = Game.getObjectById(creep.memory.target);
 
-    if (!target || !target.progress < target.progressTotal) {
+    if (!target || target.progress == target.progressTotal) {
         target = findConstructionSite(creep.room);
 
         if (target) {
@@ -188,6 +188,11 @@ function build(creep) {
 
     var result = creep.build(target);
     handleWorkResult(creep, target, result);
+
+    if (target.structureType == STRUCTURE_RAMPART ||
+        target.structureType == STRUCTURE_WALL) {
+        creep.memory.action = repair;
+    }
 }
 
 function upgrade(creep) {
@@ -212,6 +217,7 @@ function repair(creep) {
         (target.structureType == STRUCTURE_WALL && target.hits > 9000) ||
         (target.structureType == STRUCTURE_RAMPART && target.hits > 9000) ||
         target.hits == target.hitsMax) {
+
         target = findDamagedStructure(creep.room);
 
         if (target) {
@@ -261,7 +267,7 @@ function findDamagedStructure(room) {
         filter: (structure) => {
             if (structure.structureType == STRUCTURE_WALL ||
                 structure.structureType == STRUCTURE_RAMPART) {
-                return structure.hits < 9000;
+                return structure.hits < 5000;
             }
 
             return structure.hits < structure.hitsMax * 0.5;
