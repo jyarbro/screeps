@@ -208,7 +208,9 @@ function repair(creep) {
 
     var target = Game.getObjectById(creep.memory.target);
 
-    if (!target || target.hits == target.hitsMax) {
+    if (!target ||
+        (target.structureType == STRUCTURE_WALL && target.hits > 5000) ||
+        target.hits == target.hitsMax) {
         target = findDamagedStructure(creep.room);
 
         if (target) {
@@ -256,6 +258,10 @@ function findEnergyStore(room) {
 function findDamagedStructure(room) {
     var targets = room.find(FIND_STRUCTURES, {
         filter: (structure) => {
+            if (structure.structureType == STRUCTURE_WALL) {
+                return structure.hits < 5000;
+            }
+            
             return structure.hits < structure.hitsMax * 0.5;
         }
     });
