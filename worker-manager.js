@@ -25,7 +25,7 @@ function spawn() {
         for (var spawnName in Game.spawns) {
             var spawn = Game.spawns[spawnName];
 
-            if (spawn.room.energyAvailable > spawn.room.energyCapacityAvailable * 0.5) {
+            if (spawn.room.energyAvailable > 299) {
                 var parts = getMaximumParts(spawn);
 
                 if (spawn.spawnCreep(parts), 'test', { dryRun: true }) {
@@ -54,19 +54,19 @@ function findWork(creep) {
         return;
     }
 
+    target = findEnergyStore(creep.room);
+
+    if (target) {
+        creep.memory.target = target;
+        creep.memory.action = 'store';
+        return;
+    }
+
     target = findConstructionSite(creep.room);
 
     if (target) {
         creep.memory.target = target;
         creep.memory.action = 'build';
-        return;
-    }
-
-     target = findEnergyStore(creep.room);
-
-    if (target) {
-        creep.memory.target = target;
-        creep.memory.action = 'store';
         return;
     }
 
@@ -174,7 +174,7 @@ function build(creep) {
 
     var target = Game.getObjectById(creep.memory.target);
 
-    if (!target || !target.progress || !target.progress >= target.progressTotal) {
+    if (!target || !target.progress < target.progressTotal) {
         target = findConstructionSite(creep.room);
 
         if (target) {
@@ -233,7 +233,7 @@ function findSource(room) {
 
     if (targets.length > 0) {
         var index = Math.floor(Math.random() * Math.floor(targets.length));
-        return targets[index].id;
+        return targets[index];
     }
 }
 
@@ -249,7 +249,7 @@ function findEnergyStore(room) {
 
     if (targets.length > 0) {
         var index = Math.floor(Math.random() * Math.floor(targets.length));
-        return targets[index].id;
+        return targets[index];
     }
 }
 
@@ -262,7 +262,7 @@ function findDamagedStructure(room) {
 
     if (targets.length > 0) {
         var index = Math.floor(Math.random() * Math.floor(targets.length));
-        return targets[index].id;
+        return targets[index];
     }    
 }
 
@@ -271,7 +271,7 @@ function findConstructionSite(room) {
 
     if (targets.length > 0) {
         var index = Math.floor(Math.random() * Math.floor(targets.length));
-        return targets[index].id;
+        return targets[index];
     }    
 }
 
