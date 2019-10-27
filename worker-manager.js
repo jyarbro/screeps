@@ -209,7 +209,8 @@ function repair(creep) {
     var target = Game.getObjectById(creep.memory.target);
 
     if (!target ||
-        (target.structureType == STRUCTURE_WALL && target.hits > 5000) ||
+        (target.structureType == STRUCTURE_WALL && target.hits > 9000) ||
+        (target.structureType == STRUCTURE_RAMPART && target.hits > 9000) ||
         target.hits == target.hitsMax) {
         target = findDamagedStructure(creep.room);
 
@@ -258,17 +259,18 @@ function findEnergyStore(room) {
 function findDamagedStructure(room) {
     var targets = room.find(FIND_STRUCTURES, {
         filter: (structure) => {
-            if (structure.structureType == STRUCTURE_WALL) {
-                return structure.hits < 5000;
+            if (structure.structureType == STRUCTURE_WALL ||
+                structure.structureType == STRUCTURE_RAMPART) {
+                return structure.hits < 9000;
             }
-            
+
             return structure.hits < structure.hitsMax * 0.5;
         }
     });
 
     if (targets.length > 0) {
-        var index = Math.floor(Math.random() * Math.floor(targets.length));
-        return targets[index];
+        _.sortBy(targets, 'hits');
+        return targets[0];
     }    
 }
 
@@ -278,7 +280,7 @@ function findConstructionSite(room) {
     if (targets.length > 0) {
         var index = Math.floor(Math.random() * Math.floor(targets.length));
         return targets[index];
-    }    
+    }
 }
 
 function getMaximumParts(spawn) {
