@@ -99,8 +99,19 @@ function harvest(creep) {
 
         var target = Game.getObjectById(creep.memory.target);
 
-        if (creep.harvest(target) == ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, {visualizePathStyle: {stroke: '#ffaa00'}});
+        var result = creep.harvest(target);
+
+        switch(result) {
+            case ERR_NOT_IN_RANGE:
+                creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
+                break;
+
+            case ERR_NOT_ENOUGH_RESOURCES:
+            case ERR_INVALID_TARGET:
+                // TODO: Find new target
+                delete creep.memory.action;
+                delete creep.memory.target;
+                break;
         }
     }
     else {
@@ -122,8 +133,18 @@ function store(creep) {
 
         var target = Game.getObjectById(creep.memory.target);
 
-        if (creep.transfer(target, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
+        var result = creep.transfer(target, RESOURCE_ENERGY);
+
+        switch(result) {
+            case ERR_NOT_IN_RANGE:
+                creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
+                break;
+
+            case ERR_FULL:
+            case ERR_INVALID_TARGET:
+                delete creep.memory.action;
+                delete creep.memory.target;
+                break;
         }
     }
     else {
@@ -133,15 +154,34 @@ function store(creep) {
 }
 
 function build(creep) {
-    var targets = creep.room.find(FIND_CONSTRUCTION_SITES);
-    
-    if (targets.length && creep.store.getUsedCapacity() > 0) {
-        if(creep.build(targets[0]) == ERR_NOT_IN_RANGE) {
-            creep.moveTo(targets[0], {visualizePathStyle: {stroke: '#ffffff'}});
+    if (!creep.memory.target) {
+        var targets = creep.room.find(FIND_CONSTRUCTION_SITES);
+
+        if (targets.length > 0) {
+            var index = Math.floor(Math.random() * Math.floor(targets.length));
+            creep.memory.target = targets[index].id;
+        }
+    }
+
+    var target = Game.getObjectById(creep.memory.target);
+
+    if (creep.store.getUsedCapacity() > 0) {
+        var result = creep.build(target);
+
+        switch(result) {
+            case ERR_NOT_IN_RANGE:
+                creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
+                break;
+
+            case ERR_INVALID_TARGET:
+                delete creep.memory.action;
+                delete creep.memory.target;
+                break;
         }
     }
     else {
         delete creep.memory.action;
+        delete creep.memory.target;
     }
 }
 
@@ -171,24 +211,24 @@ function getMaximumParts(spawn) {
     var capacity = spawn.store.getCapacity(RESOURCE_ENERGY);
 
     if (capacity > 799) {
-        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
+        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
     }
 
     if (capacity > 699) {
-        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
     }
 
     if (capacity > 599) {
-        return [WORK, WORK, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
     }
 
     if (capacity > 499) {
-        return [WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+        return [WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
     }
 
     if (capacity > 399) {
-        return [WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+        return [WORK, WORK, CARRY, CARRY, CARRY, MOVE];
     }
 
-    return [WORK, CARRY, CARRY, MOVE, MOVE];
+    return [WORK, CARRY, CARRY, CARRY, MOVE];
 }
