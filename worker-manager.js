@@ -41,44 +41,31 @@ function findWork(creep) {
         return;
     }
 
-    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-        var target = findSource(creep.room);
-
-        if (target) {
-            creep.memory.target = target;
-            creep.memory.action = 'harvest';
-            return;
-        }
-    }
-
     if (creep.room.controller.ticksToDowngrade < 5000) {
         creep.memory.action = 'upgrade';
         return;
     }
 
-    var targets = findDamagedStructures(creep.room);
+    var target = findDamagedStructure(creep.room);
 
-    if (targets.length > 0) {
-        var index = Math.floor(Math.random() * Math.floor(targets.length));
-        creep.memory.target = targets[index].id;
+    if (target) {
+        creep.memory.target = target;
         creep.memory.action = 'repair';
         return;
     }
 
-    targets = creep.room.find(FIND_CONSTRUCTION_SITES);
+    target = findConstructionSite(creep.room);
 
-    if (targets.length > 0) {
-        var index = Math.floor(Math.random() * Math.floor(targets.length));
-        creep.memory.target = targets[index].id;
+    if (target) {
+        creep.memory.target = target;
         creep.memory.action = 'build';
         return;
     }
 
-    targets = findEnergyStores(creep.room);
+     target = findEnergyStore(creep.room);
 
-    if (targets.length > 0) {
-        var index = Math.floor(Math.random() * Math.floor(targets.length));
-        creep.memory.target = targets[index].id;
+    if (target) {
+        creep.memory.target = target;
         creep.memory.action = 'store';
         return;
     }
@@ -87,6 +74,13 @@ function findWork(creep) {
 }
 
 function doWork(creep) {
+    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) == 0 && creep.memory.action != 'harvest') {
+        creep.memory.continueAction = creep.memory.action;
+        creep.memory.continueTarget = creep.memory.target;
+        creep.memory.action = 'harvest';
+        creep.memory.target = findSource(creep.room);
+    }
+
     switch (creep.memory.action) {
         case 'harvest':
             harvest(creep);
@@ -117,7 +111,16 @@ function harvest(creep) {
     }
 
     if (creep.store.getFreeCapacity(RESOURCE_ENERGY) == 0) {
-        reset(creep);
+        if (creep.memory.continueAction && creep.memory.continueTarget) {
+            creep.memory.action = creep.memory.continueAction;
+            creep.memory.target = creep.memory.continueTarget;
+            delete creep.memory.continueAction;
+            delete creep.memory.continueTarget;
+        }
+        else {
+            reset(creep);
+        }
+
         return;
     }
 
@@ -147,13 +150,20 @@ function store(creep) {
 
     var target = Game.getObjectById(creep.memory.target);
 
-    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && target && target.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-        var result = creep.transfer(target, RESOURCE_ENERGY);
-        handleWorkResult(creep, target, result);
+    if (!target || target.store.getFreeCapacity(RESOURCE_ENERGY) == 0) {
+        target = findEnergyStore(creep.room);
+
+        if (target) {
+            creep.memory.target = target.id;
+        }
+        else {
+            reset(creep);
+            return;
+        }
     }
-    else {
-        reset(creep);
-    }
+
+    var result = creep.transfer(target, RESOURCE_ENERGY);
+    handleWorkResult(creep, target, result);
 }
 
 function build(creep) {
@@ -162,14 +172,22 @@ function build(creep) {
         return;
     }
 
-    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        var target = Game.getObjectById(creep.memory.target);
-        var result = creep.build(target);
-        handleWorkResult(creep, target, result);
+    var target = Game.getObjectById(creep.memory.target);
+
+    if (!target || !target.progress || !target.progress >= target.progressTotal) {
+        target = findConstructionSite(creep.room);
+
+        if (target) {
+            creep.memory.target = target.id;
+        }
+        else {
+            reset(creep);
+            return;
+        }
     }
-    else {
-        reset(creep);
-    }
+
+    var result = creep.build(target);
+    handleWorkResult(creep, target, result);
 }
 
 function upgrade(creep) {
@@ -190,13 +208,20 @@ function repair(creep) {
 
     var target = Game.getObjectById(creep.memory.target);
 
-    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && target.hits < target.hitsMax) {
-        var result = creep.repair(target);
-        handleWorkResult(creep, target, result);
+    if (!target || target.hits == target.hitsMax) {
+        target = findDamagedStructure(creep.room);
+
+        if (target) {
+            creep.memory.target = target.id;
+        }
+        else {
+            reset(creep);
+            return;
+        }
     }
-    else {
-        reset(creep);
-    }
+
+    var result = creep.repair(target);
+    handleWorkResult(creep, target, result);
 }
 
 function findSource(room) {
@@ -212,8 +237,8 @@ function findSource(room) {
     }
 }
 
-function findEnergyStores(room) {
-    return room.find(FIND_STRUCTURES, {
+function findEnergyStore(room) {
+    var targets = room.find(FIND_STRUCTURES, {
         filter: (structure) => {
             return (structure.structureType == STRUCTURE_EXTENSION ||
                 structure.structureType == STRUCTURE_SPAWN ||
@@ -221,14 +246,33 @@ function findEnergyStores(room) {
                 structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
         }
     });
+
+    if (targets.length > 0) {
+        var index = Math.floor(Math.random() * Math.floor(targets.length));
+        return targets[index].id;
+    }
 }
 
-function findDamagedStructures(room) {
-    return room.find(FIND_STRUCTURES, {
+function findDamagedStructure(room) {
+    var targets = room.find(FIND_STRUCTURES, {
         filter: (structure) => {
             return structure.hits < structure.hitsMax * 0.5;
         }
     });
+
+    if (targets.length > 0) {
+        var index = Math.floor(Math.random() * Math.floor(targets.length));
+        return targets[index].id;
+    }    
+}
+
+function findConstructionSite(room) {
+    var targets = room.find(FIND_CONSTRUCTION_SITES);
+
+    if (targets.length > 0) {
+        var index = Math.floor(Math.random() * Math.floor(targets.length));
+        return targets[index].id;
+    }    
 }
 
 function getMaximumParts(spawn) {
@@ -293,6 +337,14 @@ function reset(creep) {
 
     if (creep.memory.target) {
         delete creep.memory.target;
+    }
+
+    if (creep.memory.continueAction) {
+        delete creep.memory.continueAction;
+    }
+
+    if (creep.memory.continueTarget) {
+        delete creep.memory.continueTarget;
     }
 
     return OK;
