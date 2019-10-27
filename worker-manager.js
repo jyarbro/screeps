@@ -1,15 +1,15 @@
 module.exports = {
-    tick: function() {
+    tick: function () {
         spawn();
 
-        for(var name in Game.creeps) {
+        for (var name in Game.creeps) {
             var creep = Game.creeps[name];
 
             if (creep.memory.role == 'worker') {
                 if (!creep.memory.action) {
                     findWork(creep);
                 }
-    
+
                 if (creep.memory.action) {
                     doWork(creep);
                 }
@@ -29,9 +29,9 @@ function spawn() {
 
             if (spawn.store.getFreeCapacity() == 0) {
                 var parts = getMaximumParts(spawn);
-                
-                if (spawn.spawnCreep(parts), 'test', {dryRun: true}) {
-                    spawn.spawnCreep(parts, newName, {memory: {role: 'worker'}});
+
+                if (spawn.spawnCreep(parts), 'test', { dryRun: true }) {
+                    spawn.spawnCreep(parts, newName, { memory: { role: 'worker' } });
                 }
             }
         }
@@ -67,7 +67,7 @@ function findWork(creep) {
 }
 
 function doWork(creep) {
-    switch(creep.memory.action) {
+    switch (creep.memory.action) {
         case 'harvest':
             harvest(creep);
             break;
@@ -90,7 +90,7 @@ function harvest(creep) {
     if (creep.store.getFreeCapacity() > 0) {
         if (!creep.memory.target) {
             var targets = creep.room.find(FIND_SOURCES);
-            
+
             if (targets.length > 0) {
                 var index = Math.floor(Math.random() * Math.floor(targets.length));
                 creep.memory.target = targets[index].id;
@@ -100,23 +100,10 @@ function harvest(creep) {
         var target = Game.getObjectById(creep.memory.target);
 
         var result = creep.harvest(target);
-
-        switch(result) {
-            case ERR_NOT_IN_RANGE:
-                creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
-                break;
-
-            case ERR_NOT_ENOUGH_RESOURCES:
-            case ERR_INVALID_TARGET:
-                // TODO: Find new target
-                delete creep.memory.action;
-                delete creep.memory.target;
-                break;
-        }
+        handleResult(creep, target, result);
     }
     else {
-        delete creep.memory.action;
-        delete creep.memory.target;
+        reset(creep);
     }
 }
 
@@ -132,67 +119,41 @@ function store(creep) {
         }
 
         var target = Game.getObjectById(creep.memory.target);
-
         var result = creep.transfer(target, RESOURCE_ENERGY);
-
-        switch(result) {
-            case ERR_NOT_IN_RANGE:
-                creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
-                break;
-
-            case ERR_FULL:
-            case ERR_INVALID_TARGET:
-                delete creep.memory.action;
-                delete creep.memory.target;
-                break;
-        }
+        handleResult(creep, target, result);
     }
     else {
-        delete creep.memory.action;
-        delete creep.memory.target;
+        reset(creep);
     }
 }
 
 function build(creep) {
-    if (!creep.memory.target) {
-        var targets = creep.room.find(FIND_CONSTRUCTION_SITES);
-
-        if (targets.length > 0) {
-            var index = Math.floor(Math.random() * Math.floor(targets.length));
-            creep.memory.target = targets[index].id;
-        }
-    }
-
-    var target = Game.getObjectById(creep.memory.target);
-
     if (creep.store.getUsedCapacity() > 0) {
-        var result = creep.build(target);
+        if (!creep.memory.target) {
+            var targets = creep.room.find(FIND_CONSTRUCTION_SITES);
 
-        switch(result) {
-            case ERR_NOT_IN_RANGE:
-                creep.moveTo(target, {visualizePathStyle: {stroke: '#ffffff'}});
-                break;
-
-            case ERR_INVALID_TARGET:
-                delete creep.memory.action;
-                delete creep.memory.target;
-                break;
+            if (targets.length > 0) {
+                var index = Math.floor(Math.random() * Math.floor(targets.length));
+                creep.memory.target = targets[index].id;
+            }
         }
+
+        var target = Game.getObjectById(creep.memory.target);
+        var result = creep.build(target);
+        handleResult(creep, target, result);
     }
     else {
-        delete creep.memory.action;
-        delete creep.memory.target;
+        reset(creep);
     }
 }
 
 function upgrade(creep) {
     if (creep.store.getUsedCapacity() > 0) {
-        if(creep.upgradeController(creep.room.controller) == ERR_NOT_IN_RANGE) {
-            creep.moveTo(creep.room.controller, {visualizePathStyle: {stroke: '#ffffff'}});
-        }
+        var result = creep.upgradeController(creep.room.controller);
+        handleResult(creep, creep.room.controller, result);
     }
     else {
-        delete creep.memory.action;
+        reset(creep);
     }
 }
 
@@ -231,4 +192,32 @@ function getMaximumParts(spawn) {
     }
 
     return [WORK, CARRY, CARRY, CARRY, MOVE];
+}
+
+function handleResult(creep, target, result) {
+    switch (result) {
+        case ERR_NOT_IN_RANGE:
+            creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
+            break;
+
+        case ERR_FULL:
+        case ERR_NOT_ENOUGH_RESOURCES:
+        case ERR_INVALID_TARGET:
+            // TODO: Find another target
+            reset(creep);
+            break;
+
+        case ERR_NO_BODYPART:
+            creep.suicide();
+    }
+}
+
+function reset(creep) {
+    if (creep.memory.action) {
+        delete creep.memory.action;
+    }
+
+    if (creep.memory.target) {
+        delete creep.memory.target;
+    }
 }
