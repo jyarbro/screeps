@@ -19,7 +19,7 @@ module.exports = function () {
 function spawn() {
     var workers = _.filter(Game.creeps, (creep) => creep.memory.role == 'worker');
 
-    if (!workers || workers.length < 4) {
+    if (!workers || workers.length < 6) {
         var newName = 'Worker' + Game.time;
 
         for (var spawnName in Game.spawns) {
@@ -39,6 +39,23 @@ function spawn() {
 function findWork(creep) {
     if (!creep || creep.ticksToLive < 10 || creep.spawning) {
         return;
+    }
+
+    if (creep.memory.followUpLocation) {
+        var roomPosition = creep.room.getPositionAt(creep.memory.followUpLocation.x, creep.memory.followUpLocation.y);
+        var targets = roomPosition.look();
+
+        if (targets.length) {
+            targets = _.filter(targets, (target) => {
+                return target.structure && target.structure.structureType == creep.memory.followUpType && target.structure.hits == 1;
+            });
+
+            if (targets.length) {
+                creep.memory.target = targets[0].structure.id;
+                creep.memory.action = 'repair';
+                return;
+            }
+        }
     }
 
     if (creep.room.controller.ticksToDowngrade < 5000) {
@@ -128,7 +145,7 @@ function harvest(creep) {
 
     if (!target || target.energy == 0) {
         target = findSource(creep.room);
-        
+
         if (target) {
             creep.memory.target = target.id;
         }
@@ -174,7 +191,19 @@ function build(creep) {
 
     var target = Game.getObjectById(creep.memory.target);
 
-    if (!target || target.progress == target.progressTotal) {
+    if (target && (target.structureType == STRUCTURE_RAMPART || target.structureType == STRUCTURE_WALL) &&
+        !creep.memory.followUpLocation) {
+        creep.memory.followUpLocation = target.pos;
+        creep.memory.followUpType = target.structureType;
+    }
+
+    if (!target) {
+        if (creep.memory.followUpLocation) {
+            delete creep.memory.action;
+            delete creep.memory.target;
+            return;
+        }
+
         target = findConstructionSite(creep.room);
 
         if (target) {
@@ -188,11 +217,6 @@ function build(creep) {
 
     var result = creep.build(target);
     handleWorkResult(creep, target, result);
-
-    if (target.structureType == STRUCTURE_RAMPART ||
-        target.structureType == STRUCTURE_WALL) {
-        creep.memory.action = repair;
-    }
 }
 
 function upgrade(creep) {
@@ -277,7 +301,7 @@ function findDamagedStructure(room) {
     if (targets.length > 0) {
         _.sortBy(targets, 'hits');
         return targets[0];
-    }    
+    }
 }
 
 function findConstructionSite(room) {
@@ -287,6 +311,13 @@ function findConstructionSite(room) {
         var index = Math.floor(Math.random() * Math.floor(targets.length));
         return targets[index];
     }
+}
+
+function findPath(creep, target) {
+    do {
+        var path = creep.room.findPath(creep.pos, target.pos, { serialize: true });
+        creep.memory.targetPath = path;
+    } while (!path);
 }
 
 function getMaximumParts(spawn) {
@@ -319,6 +350,13 @@ function handleWorkResult(creep, target, result) {
             return;
 
         case ERR_NOT_IN_RANGE:
+            // if (!creep.memory.targetPath) {
+            //     findPath(creep, target);
+            // }
+
+            // var result = creep.moveByPath(creep.memory.targetPath);
+            // creep.say(result);
+            // break;
             return creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
 
         case ERR_FULL:
@@ -359,6 +397,10 @@ function reset(creep) {
 
     if (creep.memory.continueTarget) {
         delete creep.memory.continueTarget;
+    }
+
+    if (creep.memory.targetPath) {
+        delete creep.memory.targetPath;
     }
 
     return OK;
