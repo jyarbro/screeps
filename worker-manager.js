@@ -25,7 +25,7 @@ function spawn() {
         for (var spawnName in Game.spawns) {
             var spawn = Game.spawns[spawnName];
 
-            if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) == 0) {
+            if (spawn.room.energyAvailable > spawn.room.energyCapacityAvailable * 0.5) {
                 var parts = getMaximumParts(spawn);
 
                 if (spawn.spawnCreep(parts), 'test', { dryRun: true }) {
@@ -37,7 +37,7 @@ function spawn() {
 }
 
 function findWork(creep) {
-    if (!creep || creep.ticksToLive < 10 || creep.spawning()) {
+    if (!creep || creep.ticksToLive < 10 || creep.spawning) {
         return;
     }
 
@@ -208,26 +208,24 @@ function findDamagedStructures(room) {
 }
 
 function getMaximumParts(spawn) {
-    var capacity = spawn.store.getCapacity(RESOURCE_ENERGY);
-
-    if (capacity > 799) {
-        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
+    if (spawn.room.energyAvailable > 799) {
+        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
     }
 
-    if (capacity > 699) {
-        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
+    if (spawn.room.energyAvailable > 699) {
+        return [WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
     }
 
-    if (capacity > 599) {
-        return [WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
+    if (spawn.room.energyAvailable > 599) {
+        return [WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
     }
 
-    if (capacity > 499) {
-        return [WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
+    if (spawn.room.energyAvailable > 499) {
+        return [WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE];
     }
 
-    if (capacity > 399) {
-        return [WORK, WORK, CARRY, CARRY, CARRY, MOVE];
+    if (spawn.room.energyAvailable > 399) {
+        return [WORK, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE];
     }
 
     return [WORK, CARRY, CARRY, CARRY, MOVE];
