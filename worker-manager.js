@@ -42,11 +42,10 @@ function findWork(creep) {
     }
 
     if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-        var targets = creep.room.find(FIND_SOURCES);
+        var target = findSource(creep.room);
 
-        if (targets.length > 0) {
-            var index = Math.floor(Math.random() * Math.floor(targets.length));
-            creep.memory.target = targets[index].id;
+        if (target) {
+            creep.memory.target = target;
             creep.memory.action = 'harvest';
             return;
         }
@@ -117,15 +116,27 @@ function harvest(creep) {
         return;
     }
 
+    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) == 0) {
+        reset(creep);
+        return;
+    }
+
     var target = Game.getObjectById(creep.memory.target);
 
-    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && target.energy > 0) {
-        var result = creep.harvest(target);
-        handleWorkResult(creep, target, result);
+    if (!target || target.energy == 0) {
+        target = findSource(creep.room);
+        
+        if (target) {
+            creep.memory.target = target.id;
+        }
+        else {
+            reset(creep);
+            return;
+        }
     }
-    else {
-        reset(creep);
-    }
+
+    var result = creep.harvest(target);
+    handleWorkResult(creep, target, result);
 }
 
 function store(creep) {
@@ -136,7 +147,7 @@ function store(creep) {
 
     var target = Game.getObjectById(creep.memory.target);
 
-    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && target.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && target && target.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
         var result = creep.transfer(target, RESOURCE_ENERGY);
         handleWorkResult(creep, target, result);
     }
@@ -185,6 +196,19 @@ function repair(creep) {
     }
     else {
         reset(creep);
+    }
+}
+
+function findSource(room) {
+    var targets = room.find(FIND_SOURCES, {
+        filter: (source) => {
+            return source.energy > 0;
+        }
+    });
+
+    if (targets.length > 0) {
+        var index = Math.floor(Math.random() * Math.floor(targets.length));
+        return targets[index].id;
     }
 }
 
