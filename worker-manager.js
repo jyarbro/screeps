@@ -1,18 +1,16 @@
-module.exports = {
-    tick: function () {
-        spawn();
+module.exports = function () {
+    spawn();
 
-        for (var name in Game.creeps) {
-            var creep = Game.creeps[name];
+    for (var name in Game.creeps) {
+        var creep = Game.creeps[name];
 
-            if (creep.memory.role == 'worker') {
-                if (!creep.memory.action) {
-                    findWork(creep);
-                }
+        if (creep.memory.role == 'worker') {
+            if (!creep.memory.action) {
+                findWork(creep);
+            }
 
-                if (creep.memory.action) {
-                    doWork(creep);
-                }
+            if (creep.memory.action) {
+                doWork(creep);
             }
         }
     }
@@ -27,7 +25,7 @@ function spawn() {
         for (var spawnName in Game.spawns) {
             var spawn = Game.spawns[spawnName];
 
-            if (spawn.store.getFreeCapacity() == 0) {
+            if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) == 0) {
                 var parts = getMaximumParts(spawn);
 
                 if (spawn.spawnCreep(parts), 'test', { dryRun: true }) {
@@ -39,9 +37,19 @@ function spawn() {
 }
 
 function findWork(creep) {
-    if (creep.store.getFreeCapacity() > 0) {
-        creep.memory.action = 'harvest';
+    if (!creep || creep.ticksToLive < 10 || creep.spawning()) {
         return;
+    }
+
+    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+        var targets = creep.room.find(FIND_SOURCES);
+
+        if (targets.length > 0) {
+            var index = Math.floor(Math.random() * Math.floor(targets.length));
+            creep.memory.target = targets[index].id;
+            creep.memory.action = 'harvest';
+            return;
+        }
     }
 
     if (creep.room.controller.ticksToDowngrade < 5000) {
@@ -49,16 +57,29 @@ function findWork(creep) {
         return;
     }
 
-    var targets = creep.room.find(FIND_CONSTRUCTION_SITES);
+    var targets = findDamagedStructures(creep.room);
 
     if (targets.length > 0) {
+        var index = Math.floor(Math.random() * Math.floor(targets.length));
+        creep.memory.target = targets[index].id;
+        creep.memory.action = 'repair';
+        return;
+    }
+
+    targets = creep.room.find(FIND_CONSTRUCTION_SITES);
+
+    if (targets.length > 0) {
+        var index = Math.floor(Math.random() * Math.floor(targets.length));
+        creep.memory.target = targets[index].id;
         creep.memory.action = 'build';
         return;
     }
 
-    targets = findEnergyStorage(creep.room);
+    targets = findEnergyStores(creep.room);
 
     if (targets.length > 0) {
+        var index = Math.floor(Math.random() * Math.floor(targets.length));
+        creep.memory.target = targets[index].id;
         creep.memory.action = 'store';
         return;
     }
@@ -80,6 +101,10 @@ function doWork(creep) {
             build(creep);
             break;
 
+        case 'repair':
+            repair(creep);
+            break;
+
         case 'upgrade':
             upgrade(creep);
             break;
@@ -87,20 +112,16 @@ function doWork(creep) {
 }
 
 function harvest(creep) {
-    if (creep.store.getFreeCapacity() > 0) {
-        if (!creep.memory.target) {
-            var targets = creep.room.find(FIND_SOURCES);
+    if (!creep.memory.target) {
+        reset(creep);
+        return;
+    }
 
-            if (targets.length > 0) {
-                var index = Math.floor(Math.random() * Math.floor(targets.length));
-                creep.memory.target = targets[index].id;
-            }
-        }
+    var target = Game.getObjectById(creep.memory.target);
 
-        var target = Game.getObjectById(creep.memory.target);
-
+    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && target.energy > 0) {
         var result = creep.harvest(target);
-        handleResult(creep, target, result);
+        handleWorkResult(creep, target, result);
     }
     else {
         reset(creep);
@@ -108,19 +129,16 @@ function harvest(creep) {
 }
 
 function store(creep) {
-    if (creep.store.getUsedCapacity() > 0) {
-        if (!creep.memory.target) {
-            var targets = findEnergyStorage(creep.room);
+    if (!creep.memory.target) {
+        reset(creep);
+        return;
+    }
 
-            if (targets.length > 0) {
-                var index = Math.floor(Math.random() * Math.floor(targets.length));
-                creep.memory.target = targets[index].id;
-            }
-        }
+    var target = Game.getObjectById(creep.memory.target);
 
-        var target = Game.getObjectById(creep.memory.target);
+    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && target.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
         var result = creep.transfer(target, RESOURCE_ENERGY);
-        handleResult(creep, target, result);
+        handleWorkResult(creep, target, result);
     }
     else {
         reset(creep);
@@ -128,19 +146,15 @@ function store(creep) {
 }
 
 function build(creep) {
-    if (creep.store.getUsedCapacity() > 0) {
-        if (!creep.memory.target) {
-            var targets = creep.room.find(FIND_CONSTRUCTION_SITES);
+    if (!creep.memory.target) {
+        reset(creep);
+        return;
+    }
 
-            if (targets.length > 0) {
-                var index = Math.floor(Math.random() * Math.floor(targets.length));
-                creep.memory.target = targets[index].id;
-            }
-        }
-
+    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
         var target = Game.getObjectById(creep.memory.target);
         var result = creep.build(target);
-        handleResult(creep, target, result);
+        handleWorkResult(creep, target, result);
     }
     else {
         reset(creep);
@@ -148,22 +162,47 @@ function build(creep) {
 }
 
 function upgrade(creep) {
-    if (creep.store.getUsedCapacity() > 0) {
+    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
         var result = creep.upgradeController(creep.room.controller);
-        handleResult(creep, creep.room.controller, result);
+        handleWorkResult(creep, creep.room.controller, result);
     }
     else {
         reset(creep);
     }
 }
 
-function findEnergyStorage(room) {
+function repair(creep) {
+    if (!creep.memory.target) {
+        reset(creep);
+        return;
+    }
+
+    var target = Game.getObjectById(creep.memory.target);
+
+    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && target.hits < target.hitsMax) {
+        var result = creep.repair(target);
+        handleWorkResult(creep, target, result);
+    }
+    else {
+        reset(creep);
+    }
+}
+
+function findEnergyStores(room) {
     return room.find(FIND_STRUCTURES, {
         filter: (structure) => {
             return (structure.structureType == STRUCTURE_EXTENSION ||
                 structure.structureType == STRUCTURE_SPAWN ||
                 structure.structureType == STRUCTURE_TOWER) &&
                 structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+        }
+    });
+}
+
+function findDamagedStructures(room) {
+    return room.find(FIND_STRUCTURES, {
+        filter: (structure) => {
+            return structure.hits < structure.hitsMax * 0.5;
         }
     });
 }
@@ -194,22 +233,35 @@ function getMaximumParts(spawn) {
     return [WORK, CARRY, CARRY, CARRY, MOVE];
 }
 
-function handleResult(creep, target, result) {
+function handleWorkResult(creep, target, result) {
     switch (result) {
+        case OK:
+            return;
+
         case ERR_NOT_IN_RANGE:
-            creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
-            break;
+            return creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
 
         case ERR_FULL:
         case ERR_NOT_ENOUGH_RESOURCES:
         case ERR_INVALID_TARGET:
             // TODO: Find another target
-            reset(creep);
-            break;
+            creep.say("Invalid " + result);
+            return reset(creep);
 
         case ERR_NO_BODYPART:
-            creep.suicide();
+            creep.say("No parts");
+            return creep.suicide();
+
+        case ERR_NOT_OWNER:
+            creep.say("Not owner");
+            delete Memory.creeps[creep.name];
+            break;
+
+        default:
+            creep.say(result);
     }
+
+    return OK;
 }
 
 function reset(creep) {
@@ -220,4 +272,6 @@ function reset(creep) {
     if (creep.memory.target) {
         delete creep.memory.target;
     }
+
+    return OK;
 }
