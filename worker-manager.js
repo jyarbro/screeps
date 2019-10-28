@@ -299,7 +299,7 @@ function findDamagedStructure(room) {
     });
 
     if (targets.length > 0) {
-        _.sortBy(targets, 'hits');
+        targets = _.sortBy(targets, 'hits');
         return targets[0];
     }
 }
@@ -308,8 +308,13 @@ function findConstructionSite(room) {
     var targets = room.find(FIND_CONSTRUCTION_SITES);
 
     if (targets.length > 0) {
-        var index = Math.floor(Math.random() * Math.floor(targets.length));
-        return targets[index];
+        targets = _.sortBy(targets, (target) => {
+            return target.progressTotal - target.progress;
+        });
+
+        var target = targets[0];
+
+        return target;
     }
 }
 
@@ -347,8 +352,12 @@ function getMaximumParts(spawn) {
 function handleWorkResult(creep, target, result) {
     switch (result) {
         case OK:
-            return;
+            break;
 
+        case ERR_TIRED:
+            creep.say("Le tired");
+            break;
+            
         case ERR_NOT_IN_RANGE:
             // if (!creep.memory.targetPath) {
             //     findPath(creep, target);
@@ -357,18 +366,21 @@ function handleWorkResult(creep, target, result) {
             // var result = creep.moveByPath(creep.memory.targetPath);
             // creep.say(result);
             // break;
-            return creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
+            creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
+            break;
 
         case ERR_FULL:
         case ERR_NOT_ENOUGH_RESOURCES:
         case ERR_INVALID_TARGET:
             // TODO: Find another target
             creep.say("Invalid " + result);
-            return reset(creep);
+            reset(creep);
+            break;
 
         case ERR_NO_BODYPART:
             creep.say("No parts");
-            return creep.suicide();
+            creep.suicide();
+            break;
 
         case ERR_NOT_OWNER:
             creep.say("Not owner");
@@ -377,9 +389,8 @@ function handleWorkResult(creep, target, result) {
 
         default:
             creep.say(result);
+            break;
     }
-
-    return OK;
 }
 
 function reset(creep) {
